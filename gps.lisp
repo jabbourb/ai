@@ -14,16 +14,17 @@
   (member goal (action-add-list action)))
 
 (defclass GPS ()
-  "The General Problem Solver
-  - state: The initial state of the world, as a list of symbols
-  - actions: All the actions for the problem at hand
-  - goals: The states we aim to fulfill"
   ((state :initarg :initial
           :accessor GPS-state)
    (actions :initarg :actions
             :accessor GPS-actions)
    (goals :initarg :goals
-          :accessor GPS-goals)))
+          :accessor GPS-goals))
+  (:documentation
+    "The General Problem Solver
+    - state: The initial state of the world, as a list of symbols
+    - actions: All the actions for the problem at hand
+    - goals: The states we aim to fulfill"))
 
 (defmethod solve ((gps GPS))
   "Try to find a valid path in the states space of this GPS in order to get from the initial state to the goal, printing the actions' names as we go"
@@ -36,34 +37,33 @@
                                    (GPS-actions gps)))))
     (every #'solve-single (GPS-goals gps))))
 
+(defparameter *actions*
+  (list
+    (make-action :name 'drive-son-to-school
+                 :preconds '(son-at-home car-works)
+                 :add-list '(son-at-school)
+                 :del-list '(son-at-home))
+    (make-action :name 'shop-installs-battery
+                 :preconds '(car-needs-battery shop-knows-problem shop-has-money)
+                 :add-list '(car-works))
+    (make-action :name 'tell-shop-problem
+                 :preconds '(in-communication-with-shop)
+                 :add-list '(shop-knows-problem))
+    (make-action :name 'telephone-shop
+                 :preconds '(know-phone-number)
+                 :add-list '(in-communication-with-shop))
+    (make-action :name 'look-up-number
+                 :preconds '(have-phone-book)
+                 :add-list '(know-phone-number))
+    (make-action :name 'give-shop-money
+                 :preconds '(have-money)
+                 :add-list '(shop-has-money)
+                 :del-list '(have-money))))
+
 (defparameter *my-gps* (make-instance 'gps
-                                      :initial '(unhappy hungry)
-                                      :goals '(happy full)
-                                      :actions (list
-                                                 (make-action :name 'eat
-                                                              :preconds '(hungry)
-                                                              :add-list '(satiated)
-                                                              :del-list '(hungry))
-                                                 (make-action :name 'drink
-                                                              :preconds '(satiated)
-                                                              :add-list '(full)
-                                                              :del-list '(satiated))
-                                                 (make-action :name 'argue
-                                                              :preconds '(normal)
-                                                              :add-list '(unhappy)
-                                                              :del-list '(normal))
-                                                 (make-action :name 'play
-                                                              :preconds '(unhappy)
-                                                              :add-list '(normal)
-                                                              :del-list '(unhappy))
-                                                 (make-action :name 'chat
-                                                              :preconds '(normal)
-                                                              :add-list '(happy)
-                                                              :del-list '(normal))
-                                                 (make-action :name 'dance
-                                                              :preconds '(normal)
-                                                              :add-list '(happy)
-                                                              :del-list '(normal)))))
+                                      :initial '(son-at-home car-needs-battery have-money have-phone-book)
+                                      :goals '(son-at-school)
+                                      :actions *actions*))
 
 ;Evaluate this to get different solutions.
 ;Not guaranteed to be a uniform distribution, but who cares :p
