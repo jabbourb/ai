@@ -1,4 +1,4 @@
-; A General Problem Solver implementation.
+; A General Problem Solver implementation have-money.
 ; A GPS tries to find a path between two states in the problem's world
 ; using a means-ends analysis
 
@@ -26,16 +26,39 @@
     - actions: All the actions for the problem at hand
     - goals: The states we aim to fulfill"))
 
+(defun apply-action (state action)
+  (union (set-difference state (action-del-list action))
+         (action-add-list action)))
+
+(defmethod apply-actions ((gps GPS) actions)
+  (dolist (action actions t)
+    (print (action-name action))
+    (setf (gps-state gps) (apply-action (gps-state gps) action))))
+
 (defmethod solve ((gps GPS))
   "Try to find a valid path in the states space of this GPS in order to get from the initial state to the goal, printing the actions' names as we go"
-  (labels ((solve-single (goal)
-                         (or (member goal (GPS-state gps))
-                             (some (lambda (action)
-                                     (and (achieves-goal-p action goal)
-                                          (every #'solve-single (action-preconds action))
-                                          (print (action-name action))))
-                                   (GPS-actions gps)))))
-    (every #'solve-single (GPS-goals gps))))
+  ;; No actual modification is made until we are sure the goals are
+  ;; achievable; hence the following closures
+  (let ((state (gps-state gps))
+        (actions ()))
+    ;; Start at the goal and try to rewind the chain of actions leading
+    ;; to it, until the preconditions are met.
+    (labels ((solve-single (goal)
+                           (or (member goal state)
+                               (some (lambda (action)
+                                       (and (achieves-goal-p action goal)
+                                            (every #'solve-single (action-preconds action))
+                                            (setf state (apply-action state action))
+                                            (push action actions)))
+                                     (GPS-actions gps)))))
+
+      ;; Solve all the goals sequentially
+      (and (every #'solve-single (GPS-goals gps))
+           ;;; and make sure that they weren't clobbered in subsequent ones
+           (subsetp (gps-goals gps) state)
+           ;;; now if all went smoothly, replay the sequence of actions
+           (apply-actions gps actions)))))
+
 
 (defparameter *actions*
   (list
@@ -62,11 +85,13 @@
 
 (defparameter *my-gps* (make-instance 'gps
                                       :initial '(son-at-home car-needs-battery have-money have-phone-book)
-                                      :goals '(son-at-school)
+                                      :goals '(son-at-school have-money)
                                       :actions *actions*))
 
 ;Evaluate this to get different solutions.
 ;Not guaranteed to be a uniform distribution, but who cares :p
-(setf (gps-actions *my-gps*) (sort (gps-actions *my-gps*) #'> :key (lambda (x) (random 1.0))))
+(setf (gps-actions *my-gps*) (sort (gps-actions *my-gps*) #'> :key (lambda (x) (declare (ignore x)) (random 1.0))))
 
-(solve *my-gps*)
+(if (solve *my-gps*)
+  (print 'solved)
+  (print 'failed))
