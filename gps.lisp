@@ -57,7 +57,7 @@
            ;;; and make sure that they weren't clobbered in subsequent ones
            (subsetp (gps-goals gps) state)
            ;;; now if all went smoothly, replay the sequence of actions
-           (apply-actions gps actions)))))
+           (apply-actions gps (nreverse actions))))))
 
 
 (defparameter *actions*
