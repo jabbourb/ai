@@ -6,7 +6,6 @@
 
 (defun cell-x (cell)
   (car cell))
-
 (defun cell-y (cell)
   (cdr cell))
 
@@ -16,12 +15,15 @@
   (setf (aref board (cell-x pos) (cell-y pos)) color))
 
 (defun horizontal-p (start end)
+  "Tests if both cells are in the same row"
   (eql (cell-y start) (cell-y end)))
 
 (defun vertical-p (start end)
+  "Tests if both cells are in the same column"
   (eql (cell-x start) (cell-x end)))
 
 (defun color-inv (color)
+  "Returns the opposite color"
   (case color
     (:white :black)
     (:black :white)
@@ -34,6 +36,7 @@
     (range b a)))
 
 (defun intermediate-cells (start end)
+  "Returns the list of cells between start and end, exclusive"
   (cond ((horizontal-p start end)
          (mapcar (lambda (x) (cons x (cell-y start))) (range (cell-x start) (cell-x end))))
         ((vertical-p start end)
@@ -42,13 +45,57 @@
           (mapcar #'cons (range (cell-x start) (cell-x end)) (range (cell-y start) (cell-y end))))))
 
 (defun flip-cells (board start end color)
+  "Flip board cells between start and end so that they match the specified color"
   (dolist (c (intermediate-cells start end) board)
     (if (not (null (board-cell-at board c)))
       (setf (board-cell-at board c) color))))
 
-(defun valid-move (board pos color)
-  nil)
+(defun in-bounds (x y)
+  "Check if coordinates are inside the board"
+  (and (< -1 x board-size)
+       (< -1 y board-size)))
+
+(defun cartesian-self (lst)
+  "Compute the cartesian product of a set with itself"
+  (mapcan (lambda (x) (mapcar (lambda (y) (cons x y)) lst)) lst))
+
+(defun validate-move (board pos color)
+  "If the move is valid, return the list of cells that close the bracket in all directions.
+  Else return nil."
+  (let ((!color (color-inv color)))
+    (labels ((valid-move-incr (p step-x step-y acc)
+                              (let ((next-x (funcall step-x (cell-x p)))
+                                    (next-y (funcall step-y (cell-y p))))
+                                (when (in-bounds next-x next-y)
+                                  (let* ((next-cell (cons next-x next-y))
+                                         (next-color (board-cell-at board next-cell)))
+                                    (or
+                                      (and (eql next-color color)
+                                           (plusp acc) ;At least one piece of the opposite color
+                                           next-cell)
+                                      (and (eql next-color !color)
+                                           (valid-move-incr next-cell step-x step-y (1+ acc)))))))))
+
+      (and (null (board-cell-at board pos))
+           (remove nil (mapcar (lambda (steps) (valid-move-incr pos (car steps) (cdr steps) 0))
+                               (remove (cons #'identity #'identity)
+                                       (cartesian-self (list #'identity
+                                                             (lambda (x) (1+ x))
+                                                             (lambda (x) (1- x))))
+                                       :test #'equal)))))))
+
+(defun do-move (board pos color)
+  "Place a piece on the board at the specified position, flipping other
+  pieces as required. Returns the board if the move was executed, nil if
+  it was invalid."
+  (let ((ends (validate-move board pos color)))
+    (and (dolist (end ends ends)
+           (flip-cells board pos end color))
+         (setf (board-cell-at board pos) color)
+         board)))
+
 
 (defparameter *board* (make-board))
 (setf (board-cell-at *board* '(2 . 2)) :white)
-(flip-cells *board* '(1 . 1) '(5 . 5) :black)
+(setf (board-cell-at *board* '(1 . 1)) :black)
+(pprint (do-move *board* '(3 . 3) :black))
