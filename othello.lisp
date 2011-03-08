@@ -1,9 +1,5 @@
 (defconstant board-size 8)
 
-(defun make-board()
-  (make-array (list board-size board-size)
-              :initial-element nil))
-
 (defun cell-x (cell)
   (car cell))
 (defun cell-y (cell)
@@ -13,6 +9,15 @@
   (aref board (cell-x pos) (cell-y pos)))
 (defun (setf board-cell-at) (color board pos)
   (setf (aref board (cell-x pos) (cell-y pos)) color))
+
+(defun make-board()
+  (let ((board (make-array (list board-size board-size)
+                           :initial-element nil)))
+    (setf (board-cell-at board '(3 . 3)) :white)
+    (setf (board-cell-at board '(4 . 4)) :white)
+    (setf (board-cell-at board '(3 . 4)) :black)
+    (setf (board-cell-at board '(4 . 3)) :black)
+    board))
 
 (defun horizontal-p (start end)
   "Tests if both cells are in the same row"
@@ -94,8 +99,47 @@
          (setf (board-cell-at board pos) color)
          board)))
 
+(defun has-valid-move (board color)
+  (dotimes (x board-size)
+    (dotimes (y board-size)
+      (if (validate-move board (cons x y) color)
+        (return-from has-valid-move t))))
+  nil)
 
-(defparameter *board* (make-board))
-(setf (board-cell-at *board* '(2 . 2)) :white)
-(setf (board-cell-at *board* '(1 . 1)) :black)
-(pprint (do-move *board* '(3 . 3) :black))
+(defun is-game-over (board)
+  (not (or (has-valid-move board :black)
+           (has-valid-move board :white))))
+
+(defmacro while (test &body body)
+  `(do ()
+     ((not ,test))
+     ,@body))
+
+(defmacro loop-while-not (test)
+  `(do ()
+     (,test)))
+
+(defun othello ()
+  (let ((board (make-board))
+        (move nil))
+    (labels ((single-turn(color)
+               (format t "~A~&~A> " board color)
+               (finish-output nil)
+               (if (has-valid-move board color)
+                 (and
+                   (setf move (read))
+                   (consp move)
+                   (do-move board move color))
+                 t)))
+
+      (while (not (is-game-over board))
+             (loop-while-not (single-turn :black))
+             (loop-while-not (single-turn :white)))
+      (princ "Game Over!"))))
+
+;(defparameter *board* (make-board))
+;(setf (board-cell-at *board* '(2 . 2)) :white)
+;(setf (board-cell-at *board* '(1 . 1)) :black)
+;(pprint (do-move *board* '(3 . 3) :black))
+
+(othello)
