@@ -1,4 +1,5 @@
 (defconstant board-size 8)
+(defparameter *cell-width* 5)
 
 (defun cell-x (cell)
   (car cell))
@@ -18,6 +19,23 @@
     (setf (board-cell-at board '(3 . 4)) :black)
     (setf (board-cell-at board '(4 . 3)) :black)
     board))
+
+(defun cell-string (color)
+  (case color
+    (:black "B")
+    (:white "W")
+    (t "")))
+
+(defun board-print (stream board)
+  (dotimes (x board-size)
+    (format stream " ~v:@<~d~>" *cell-width* x))
+  (let ((line-sep (make-string (* board-size (1+ *cell-width*))
+                               :initial-element #\-)))
+    (dotimes (y board-size)
+      (format stream "~& ~A~&~d|" line-sep y)
+      (dotimes (x board-size)
+        (format stream "~v:@<~a~>|" *cell-width*
+                (cell-string (board-cell-at board (cons x y))))))))
 
 (defun horizontal-p (start end)
   "Tests if both cells are in the same row"
@@ -68,18 +86,18 @@
   "If the move is valid, return the list of cells that close the bracket in all directions.
   Else return nil."
   (let ((!color (color-inv color)))
-    (labels ((valid-move-incr (p step-x step-y acc)
-                              (let ((next-x (funcall step-x (cell-x p)))
-                                    (next-y (funcall step-y (cell-y p))))
-                                (when (in-bounds next-x next-y)
-                                  (let* ((next-cell (cons next-x next-y))
-                                         (next-color (board-cell-at board next-cell)))
-                                    (or
-                                      (and (eql next-color color)
-                                           (plusp acc) ;At least one piece of the opposite color
-                                           next-cell)
-                                      (and (eql next-color !color)
-                                           (valid-move-incr next-cell step-x step-y (1+ acc)))))))))
+    (labels ((valid-move-incr(p step-x step-y acc)
+               (let ((next-x (funcall step-x (cell-x p)))
+                     (next-y (funcall step-y (cell-y p))))
+                 (when (in-bounds next-x next-y)
+                   (let* ((next-cell (cons next-x next-y))
+                          (next-color (board-cell-at board next-cell)))
+                     (or
+                       (and (eql next-color color)
+                            (plusp acc) ;At least one piece of the opposite color
+                            next-cell)
+                       (and (eql next-color !color)
+                            (valid-move-incr next-cell step-x step-y (1+ acc)))))))))
 
       (and (null (board-cell-at board pos))
            (remove nil (mapcar (lambda (steps) (valid-move-incr pos (car steps) (cdr steps) 0))
@@ -110,36 +128,50 @@
   (not (or (has-valid-move board :black)
            (has-valid-move board :white))))
 
+(defun winner-is (board)
+  (labels ((count-pieces(color)
+             (let ((cnt 0))
+               (dotimes (x board-size cnt)
+                 (dotimes (y board-size)
+                   (when (eql (board-cell-at board (cons x y)) color)
+                     (incf cnt)))))))
+
+    (let ((diff (- (count-pieces :black) (count-pieces :white))))
+      (cond ((plusp diff) :black)
+            ((minusp diff) :white)
+            (t nil)))))
+
 (defmacro while (test &body body)
   `(do ()
      ((not ,test))
      ,@body))
 
-(defmacro loop-while-not (test)
-  `(do ()
-     (,test)))
+(defmacro do-while-not (vars body test)
+  `(do ,(mapcar #'list `,vars)
+     (,test)
+     ,@body))
 
 (defun othello ()
-  (let ((board (make-board))
-        (move nil))
+  (let ((board (make-board)))
     (labels ((single-turn(color)
-               (format t "~A~&~A> " board color)
-               (finish-output nil)
-               (if (has-valid-move board color)
-                 (and
-                   (setf move (read))
-                   (consp move)
-                   (do-move board move color))
-                 t)))
+               (when (has-valid-move board color)
+                 (board-print t board)
+                 (do-while-not (move)
+                               ((format t "~&~A> " color)
+                                (finish-output nil)
+                                (setf move (read)))
+                               (and (consp move)
+                                    (do-move board move color))))))
 
       (while (not (is-game-over board))
-             (loop-while-not (single-turn :black))
-             (loop-while-not (single-turn :white)))
-      (princ "Game Over!"))))
+             (single-turn :black)
+             (single-turn :white))
 
-;(defparameter *board* (make-board))
-;(setf (board-cell-at *board* '(2 . 2)) :white)
-;(setf (board-cell-at *board* '(1 . 1)) :black)
-;(pprint (do-move *board* '(3 . 3) :black))
+      (princ "Game Over!")
+      (let ((winner (winner-is board)))
+        (if (null winner)
+          (princ "It is a tie!")
+          (format t "And the winner is... ~a!" winner))))))
+
 
 (othello)
