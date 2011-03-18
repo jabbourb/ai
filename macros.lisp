@@ -1,0 +1,22 @@
+(defmacro for (x start end &body body)
+  (let ((gend (gensym)))
+    `(do ((,x ,start (incf ,x))
+          (,gend ,end))
+       ((> ,x ,gend))
+       ,@body)))
+
+(defmacro random-choice (&body choices)
+  `(case (random ,(length choices))
+     ,@(let ((acc ()))
+         (dotimes (idx (length choices) acc)
+           (push `(,idx ,(elt choices idx)) acc)))))
+
+(defmacro random-choice2 (&body choices)
+  `(case (random ,(length choices))
+     ,@(let ((key -1))
+         (mapcar (lambda (choice) `(,(incf key) ,choice))
+                 choices))))
+
+(defmacro with-gensyms (syms &body body)
+    `(let ,(mapcar (lambda (sym) `(,sym (gensym))) syms)
+       ,@body))
