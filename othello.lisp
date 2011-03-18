@@ -241,6 +241,39 @@ algorithm"
     (lambda (board color)
       (car (minimax-turn board color color ply)))))
 
+(defmacro select-alpha-beta (moves a-or-b comp-new-old)
+  "Auxiliary function for alpha-beta-searcher (we need alpha/beta as a symbol, hence the macro)"
+  `(dolist (move ,moves ,a-or-b)
+     (let ((new-a-or-b (cons move (cdr (alpha-beta-turn (do-move (copy-board board) move move-color)
+                                                        orig-color (color-inv move-color) (1- ply) alpha beta)))))
+       (if (,comp-new-old (cdr new-a-or-b) (cdr ,a-or-b))
+           (setf ,a-or-b new-a-or-b)))
+     (if (<= (cdr beta) (cdr alpha)) (return ,a-or-b))))
+
+(defun alpha-beta-searcher (ply score)
+  "Perform a tree search with alpha-beta pruning.
+This is basically a minimax algorithm with improved performance:
+knowing that along another path rooted at the same parent we can get
+as good as alpha and as low as beta, we walk through the rest of the
+tree skipping branches that can't lower beta or improve alpha"
+  (labels ((alpha-beta-turn (board orig-color move-color ply alpha beta)
+             (let ((moves nil))
+               (cond ((or (zerop ply)
+                          (null (setf moves (valid-moves board move-color))))
+                      (cons nil (funcall score board orig-color)))
+                     ((eql orig-color move-color)
+                                        ;select highest alpha
+                      (select-alpha-beta moves alpha >))
+                     (t
+                                        ;or lowest beta
+                      (select-alpha-beta moves beta <))))))
+
+    (lambda (board color)
+      (car (alpha-beta-turn board color color ply
+                            (cons nil most-negative-fixnum)
+                            (cons nil most-positive-fixnum))))))
+
+
 ;;;; Main function
 (defun check-and-play (board player color)
   (and (has-valid-move board color)
@@ -274,3 +307,4 @@ algorithm"
       winner)))
 
 (othello #'maximize-strategy (minimax-searcher 4 #'score))
+(othello (minimax-searcher 4 #'score) (alpha-beta-searcher 5 #'score))
