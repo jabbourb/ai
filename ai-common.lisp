@@ -1,7 +1,53 @@
 (defpackage :ai.common
   (:use :common-lisp)
-  (:export :alpha-beta-searcher))
+  (:export :minimax-searcher
+           :alpha-beta-searcher))
+
 (in-package :ai.common)
+
+(defun minimax-searcher (ply opponent move-generator do-move score)
+  "Perform a minimax tree search. We unfold the tree of
+configurations, evaluate leaf nodes, and rewind by alternatively
+selecting a player at each level and selecting the best move for that
+player between all children.
+
+@ply: maximum recursion depth
+@opponent: a function that takes a player, and returns the opposite
+player
+@move-generator: a function that takes a node and a player, and
+computes all possible moves for that player
+@do-move: a function that takes a node, a move and a player, and
+returns the child obtained by playing that move. It is up to that
+function to make a copy of the node if it modifies it.
+@score: a scoring function that takes a node and a player, and
+computes the node's score for that player
+
+@return: a function that takes a root node and a player, and computes
+the best move for that player."
+
+  (labels ((select-move (moves comparator)
+             (let ((best (first moves)))
+               (dolist (move (rest moves) best)
+                 (if (funcall comparator (cdr move) (cdr best))
+                     (setf best move)))))
+
+           (minimax-turn (node orig-player move-player ply)
+             (let ((moves nil))
+               (if (or (zerop ply)
+                       (null (setf moves (funcall move-generator node move-player))))
+                                        ;we select no move at a leaf
+                   (cons nil (funcall score node orig-player))
+                   (let ((scores (mapcar
+                                  (lambda (move)
+                                    (cons move (cdr (minimax-turn (funcall do-move node move move-player)
+                                                                  orig-player (funcall opponent move-player) (1- ply)))))
+                                  moves)))
+                     (if (eql orig-player move-player)
+                         (select-move scores #'>)
+                         (select-move scores #'<)))))))
+
+    (lambda (root player)
+      (car (minimax-turn root player player ply)))))
 
 (defmacro select-alpha-beta (a-or-b comp-new-old)
   "Auxiliary function for alpha-beta-searcher (we need alpha/beta as a symbol, hence the macro)"
@@ -20,19 +66,7 @@ another path rooted at the same parent we can get as good as alpha and
 as low as beta, we walk through the rest of the tree skipping branches
 that can't lower beta or improve alpha.
 
-@ply: the recursion depth
-@opponent: a function that takes a player, and returns the opposite
-player
-@move-generator: a function that takes a node and a player, and
-computes all possible moves for that player
-@do-move: a function that takes a node, a move and a player, and
-returns the child obtained by playing that move. It is up to that
-function to make a copy of the node if it modifies it.
-@score: a scoring function that takes a node and a player, and
-computes the node's score for that player
-
-@return: a function that takes a root node and a player, and computes
-the best move for that player."
+See minimax-searcher for parameters and return value"
 
   (labels ((alpha-beta-turn (node orig-player move-player ply alpha beta)
              "*Note* internally, alpha and beta are stored as conses,
@@ -41,7 +75,6 @@ the best move for that player."
              (let ((moves nil))
                (cond ((or (zerop ply)
                           (null (setf moves (funcall move-generator node move-player))))
-                                        ;we select no move at a leaf
                       (cons nil (funcall score node orig-player)))
                      ((eql orig-player move-player)
                                         ;select highest alpha

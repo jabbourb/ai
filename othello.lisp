@@ -219,33 +219,8 @@ difference of pieces to the advantage of the player"
 (defun do-move-copy (board move color)
   (do-move (copy-board board) move color))
 
-(defun minimax-searcher (ply score)
-  "Build a bot that, when given a board and a color, will unfold the
-tree of moves up to a certain depth specified by *ply*, evaluate end
-configurations using *score* and rewind the tree by applying a minimax
-algorithm"
-  (labels ((select-move (moves comparator)
-             (let ((best (first moves)))
-               (dolist (move (rest moves) best)
-                 (if (funcall comparator (cdr move) (cdr best))
-                     (setf best move)))))
-
-           (minimax-turn (board orig-color move-color ply)
-			 (let ((moves nil))
-			   (if (or (zerop ply)
-					   (null (setf moves (valid-moves board move-color))))
-				   (cons nil (funcall score board orig-color))
-				   (let ((scores (mapcar
-								  (lambda (move)
-									(cons move (cdr (minimax-turn (do-move (copy-board board) move move-color)
-																  orig-color (color-inv move-color) (1- ply)))))
-								  moves)))
-					 (if (eql orig-color move-color)
-						 (select-move scores #'>)
-						 (select-move scores #'<)))))))
-
-	(lambda (board color)
-	  (car (minimax-turn board color color ply)))))
+(defun minimax-othello (ply score)
+  (minimax-searcher ply #'color-inv #'valid-moves #'do-move-copy score))
 
 (defun alpha-beta-othello (ply score)
   (alpha-beta-searcher ply #'color-inv #'valid-moves #'do-move-copy score))
@@ -282,5 +257,5 @@ algorithm"
           (format t "And the winner is... ~a!" winner))
       winner)))
 
-(othello #'maximize-strategy (minimax-searcher 4 #'score))
-(othello (minimax-searcher 4 #'score) (alpha-beta-othello 5 #'score))
+(othello #'random-strategy (minimax-othello 4 #'score))
+(othello (minimax-othello 4 #'score) (alpha-beta-othello 5 #'score))
